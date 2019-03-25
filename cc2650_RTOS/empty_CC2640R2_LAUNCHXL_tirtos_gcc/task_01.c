@@ -35,6 +35,8 @@ Clock_Handle PeriodicLEDClock_handle;
 /* Events */
 #define APPLICATION_MESSAGE Event_Id_00
 #define PERIODIC_LED_CLOCK_EVENT (1U << 0)
+#define BUTTON_0_HWI_EVENT (1U << 1)
+
 
 Event_Handle task01_Event;
 
@@ -59,7 +61,6 @@ Mailbox_Handle mailbox_handle;
 Mailbox_Params mailbox_params;
 
 
-
 /* Task Functions*/
 void createTask01( void );
 static void initTask01( void );
@@ -68,6 +69,9 @@ static void task01(UArg a0, UArg a1);
 
 /* Periodic Clock Callbacks*/
 static void PeriodicLEDClock_task(UArg a0);
+
+/* Button callbacks */
+static void gpioButton0Callback(uint_least8_t index);
 
 /* Mailbox functions */
 static void enqueMessage(uint8_t event, void *pData);
@@ -109,6 +113,13 @@ static void initTask01( void )
     GPIO_init();
     GPIO_setConfig(Board_GPIO_LED0, GPIO_CFG_OUT_STD | GPIO_CFG_OUT_LOW);
     GPIO_write(Board_GPIO_LED0, Board_GPIO_LED_ON);
+    GPIO_setConfig(Board_GPIO_LED1, GPIO_CFG_OUT_STD | GPIO_CFG_OUT_LOW);
+    GPIO_write(Board_GPIO_LED1, Board_GPIO_LED_OFF);
+
+    /* Set callback for hardware interrupt */
+    GPIO_setConfig(Board_GPIO_BUTTON0, GPIO_CFG_IN_PU | GPIO_CFG_IN_INT_FALLING);
+    GPIO_setCallback(Board_GPIO_BUTTON0, gpioButton0Callback);
+    GPIO_enableInt(Board_GPIO_BUTTON0);
 
     /* Initialise the LED periodic clock*/
     Clock_Params_init(&PeriodicLEDClock_params);
@@ -172,6 +183,11 @@ static void task01(UArg a0, UArg a1)
                     GPIO_toggle(Board_GPIO_LED0);
                     break;
                 }
+                case BUTTON_0_HWI_EVENT:
+                {
+                    GPIO_toggle(Board_GPIO_LED1);
+                    break;
+                }
                 default:
                     break;
             }
@@ -191,6 +207,10 @@ static void PeriodicLEDClock_task(UArg a0)
     enqueMessage(PERIODIC_LED_CLOCK_EVENT, NULL);
 }
 
+static void gpioButton0Callback(uint_least8_t index)
+{
+    enqueMessage(BUTTON_0_HWI_EVENT, NULL);
+}
 
 static void enqueMessage(uint8_t event, void *pData)
 {

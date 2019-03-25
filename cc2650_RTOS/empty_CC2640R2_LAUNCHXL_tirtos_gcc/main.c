@@ -36,7 +36,9 @@ int main(void)
     /* Create Task 01 */
     createTask01();
 
+    /* Start the RTOS up*/
     BIOS_start();
 
+    /* Should never reach here */
     return (0);
 }
