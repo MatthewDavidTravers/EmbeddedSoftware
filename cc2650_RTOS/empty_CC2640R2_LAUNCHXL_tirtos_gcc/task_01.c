@@ -138,8 +138,8 @@ static void initTask01( void )
     Mailbox_Params_init(&mailbox_params);
     mailbox_params.buf = (Ptr)mailbox_buffer;
     mailbox_params.bufSize = sizeof(mailbox_buffer);
-    mailbox_params.readerEvent = task01_Event;
-    mailbox_params.readerEventId = MAILBOX_NOT_EMPTY_EVENT;
+    //mailbox_params.readerEvent = task01_Event;
+    //mailbox_params.readerEventId = MAILBOX_NOT_EMPTY_EVENT;
     Mailbox_construct(&mailbox_struct, sizeof(MsgObj), MAILBOX_DEPTH, &mailbox_params, NULL);
     mailbox_handle = Mailbox_handle(&mailbox_struct);
 
@@ -181,4 +181,5 @@ static void PeriodicLEDClock_task(UArg a0)
     msg.id = 0;
     msg.val = 0;
     Mailbox_post(mailbox_handle, &msg, BIOS_NO_WAIT);
+    Event_post(task01_Event, MAILBOX_NOT_EMPTY_EVENT); // only doing this as i cannot set the semaphore internal event in the cfg
 }
