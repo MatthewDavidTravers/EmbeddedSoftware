@@ -6,10 +6,12 @@
  */
 
 
+#include <ti/sysbios/BIOS.h>
 #include <ti/sysbios/knl/Task.h>
 #include <xdc/runtime/Error.h>
 #include <ti/sysbios/knl/Clock.h>
-//#include <ti/sysbios/knl/Event.h>
+#include <ti/sysbios/knl/Event.h>
+#include <ti/sysbios/knl/Mailbox.h>
 //#include <ti/sysbios/knl/Queue.h>
 //#include <ti/drivers/utils/List.h>
 
@@ -40,6 +42,30 @@ Error_Block task_01_eb;
 #define LED_CLOCK_PERIOD 10000
 Clock_Params PeriodicLEDClock_params;
 Clock_Handle PeriodicLEDClock_handle;
+
+/* Events */
+#define MAILBOX_NOT_EMPTY_EVENT Event_Id_00
+Event_Handle task01_Event;
+
+
+
+/* Mailbox */
+#define MAILBOX_DEPTH 5
+
+typedef struct MsgObj {
+    Int     id;
+    Char    val;
+} MsgObj;
+
+typedef struct MailboxMsgObj {
+    Mailbox_MbxElem  elem;      /* Mailbox header        */
+    MsgObj           obj;       /* Application's mailbox */
+} MailboxMsgObj;
+
+MailboxMsgObj mailbox_buffer[MAILBOX_DEPTH];
+Mailbox_Struct mailbox_struct;
+Mailbox_Handle mailbox_handle;
+Mailbox_Params mailbox_params;
 
 
 
@@ -100,6 +126,23 @@ static void initTask01( void )
         spinTask01();
     }
 
+    /* Setup the Events */
+    task01_Event = Event_create(NULL, &task_01_eb);
+    if (task01_Event == NULL)
+    {
+        spinTask01();
+    }
+
+
+    /* Construct a Mailbox instance */
+    Mailbox_Params_init(&mailbox_params);
+    mailbox_params.buf = (Ptr)mailbox_buffer;
+    mailbox_params.bufSize = sizeof(mailbox_buffer);
+    //mailbox_params.readerEvent = task01_Event;
+    //mailbox_params.readerEventId = MAILBOX_NOT_EMPTY_EVENT;
+    Mailbox_construct(&mailbox_struct, sizeof(MsgObj), MAILBOX_DEPTH, &mailbox_params, NULL);
+    mailbox_handle = Mailbox_handle(&mailbox_struct);
+
 }
 
 
@@ -107,21 +150,36 @@ static void initTask01( void )
 static void task01(UArg a0, UArg a1)
 {
 
-    /* 1 second delay */
-    uint32_t time = 1;
-
     /* Initialise the task*/
     initTask01();
 
+    UInt events;
+    MsgObj msg;
 
-    while (1) {
-        sleep(time);
-        //GPIO_toggle(Board_GPIO_LED0);
+    while (1)
+    {
+        /* Pend on OR'd events */
+        events = Event_pend(task01_Event,
+                            Event_Id_NONE,
+                            MAILBOX_NOT_EMPTY_EVENT,
+                            BIOS_WAIT_FOREVER);
+
+        /* Check if a message was posted */
+        if (events & MAILBOX_NOT_EMPTY_EVENT)
+        {
+            Mailbox_pend(mailbox_handle, &msg, BIOS_NO_WAIT);
+            GPIO_toggle(Board_GPIO_LED0);
+        }
     }
 }
 
 
 static void PeriodicLEDClock_task(UArg a0)
 {
-    GPIO_toggle(Board_GPIO_LED0);
+    MsgObj msg;
+
+    msg.id = 0;
+    msg.val = 0;
+    Mailbox_post(mailbox_handle, &msg, BIOS_NO_WAIT);
+    Event_post(task01_Event, MAILBOX_NOT_EMPTY_EVENT); // only doing this as i cannot set the semaphore internal event in the cfg
 }
