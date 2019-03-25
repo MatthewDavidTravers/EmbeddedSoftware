@@ -8,7 +8,7 @@
 
 #include <ti/sysbios/knl/Task.h>
 #include <xdc/runtime/Error.h>
-//#include <ti/sysbios/knl/Clock.h>
+#include <ti/sysbios/knl/Clock.h>
 //#include <ti/sysbios/knl/Event.h>
 //#include <ti/sysbios/knl/Queue.h>
 //#include <ti/drivers/utils/List.h>
@@ -36,12 +36,22 @@ Task_Params task_01_Params;
 Task_Handle task_01_handle;
 Error_Block task_01_eb;
 
+/* Clock properties*/
+#define LED_CLOCK_PERIOD 10000
+Clock_Params PeriodicLEDClock_params;
+Clock_Handle PeriodicLEDClock_handle;
+
+
 
 /* Task Functions*/
 void createTask01( void );
 static void initTask01( void );
 static void spinTask01( void );
 static void task01(UArg a0, UArg a1);
+
+/* Periodic Clock Callbacks*/
+static void PeriodicLEDClock_task(UArg a0);
+
 
 
 /* Create Task Dynamically */
@@ -75,15 +85,21 @@ static void spinTask01( void )
 /* Init Task 01 */
 static void initTask01( void )
 {
-    /* Call driver init functions */
+    /* Initialise the GPIO */
     GPIO_init();
-    // I2C_init();
-    // SPI_init();
-    // UART_init();
-    // Watchdog_init();
-
-    /* Configure the LED pin */
     GPIO_setConfig(Board_GPIO_LED0, GPIO_CFG_OUT_STD | GPIO_CFG_OUT_LOW);
+    GPIO_write(Board_GPIO_LED0, Board_GPIO_LED_ON);
+
+    /* Initialise the LED periodic clock*/
+    Clock_Params_init(&PeriodicLEDClock_params);
+    PeriodicLEDClock_params.period = LED_CLOCK_PERIOD;
+    PeriodicLEDClock_params.startFlag = TRUE;
+    PeriodicLEDClock_params.arg = (UArg)0x5555;
+    PeriodicLEDClock_handle = Clock_create(PeriodicLEDClock_task, LED_CLOCK_PERIOD, &PeriodicLEDClock_params, &task_01_eb);
+    if (PeriodicLEDClock_handle == NULL) {
+        spinTask01();
+    }
+
 }
 
 
@@ -97,11 +113,15 @@ static void task01(UArg a0, UArg a1)
     /* Initialise the task*/
     initTask01();
 
-    /* Turn on user LED */
-    GPIO_write(Board_GPIO_LED0, Board_GPIO_LED_ON);
 
     while (1) {
         sleep(time);
-        GPIO_toggle(Board_GPIO_LED0);
+        //GPIO_toggle(Board_GPIO_LED0);
     }
+}
+
+
+static void PeriodicLEDClock_task(UArg a0)
+{
+    GPIO_toggle(Board_GPIO_LED0);
 }
