@@ -32,6 +32,12 @@ Error_Block task_01_eb;
 Clock_Params PeriodicLEDClock_params;
 Clock_Handle PeriodicLEDClock_handle;
 
+#define BUTTON_DEBOUNCE_LENGTH 100
+Clock_Params button0DebounceClock_params;
+Clock_Handle button0DebounceClock_handle;
+uint_fast8_t button0State;
+
+
 /* Events */
 #define APPLICATION_MESSAGE Event_Id_00
 #define PERIODIC_LED_CLOCK_EVENT (1U << 0)
@@ -72,6 +78,7 @@ static void PeriodicLEDClock_task(UArg a0);
 
 /* Button callbacks */
 static void gpioButton0Callback(uint_least8_t index);
+static void gpioButton0DebounceCallback(UArg a0);
 
 /* Mailbox functions */
 static void enqueMessage(uint8_t event, void *pData);
@@ -128,6 +135,15 @@ static void initTask01( void )
     //PeriodicLEDClock_params.arg = (UArg)0x5555;
     PeriodicLEDClock_handle = Clock_create(PeriodicLEDClock_task, LED_CLOCK_PERIOD, &PeriodicLEDClock_params, &task_01_eb);
     if (PeriodicLEDClock_handle == NULL) {
+        spinTask01();
+    }
+
+    /* Initialise the button 0 debounce one-shot clock */
+    Clock_Params_init(&button0DebounceClock_params);
+    button0DebounceClock_params.period = 0;
+    button0DebounceClock_params.startFlag = FALSE;
+    button0DebounceClock_handle = Clock_create(gpioButton0DebounceCallback, BUTTON_DEBOUNCE_LENGTH, &button0DebounceClock_params, &task_01_eb);
+    if (button0DebounceClock_handle == NULL) {
         spinTask01();
     }
 
@@ -207,9 +223,22 @@ static void PeriodicLEDClock_task(UArg a0)
     enqueMessage(PERIODIC_LED_CLOCK_EVENT, NULL);
 }
 
+static void gpioButton0DebounceCallback(UArg a0)
+{
+    if(GPIO_read(Board_GPIO_BUTTON0) == button0State)
+    {
+        enqueMessage(BUTTON_0_HWI_EVENT, NULL);
+    }
+
+    GPIO_enableInt(Board_GPIO_BUTTON0);
+
+}
+
 static void gpioButton0Callback(uint_least8_t index)
 {
-    enqueMessage(BUTTON_0_HWI_EVENT, NULL);
+    GPIO_disableInt(Board_GPIO_BUTTON0);
+    button0State = GPIO_read(Board_GPIO_BUTTON0);
+    Clock_start(button0DebounceClock_handle);
 }
 
 static void enqueMessage(uint8_t event, void *pData)
