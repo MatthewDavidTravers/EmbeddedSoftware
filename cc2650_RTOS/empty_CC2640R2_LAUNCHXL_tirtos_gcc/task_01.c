@@ -114,7 +114,7 @@ static void initTask01( void )
     Clock_Params_init(&PeriodicLEDClock_params);
     PeriodicLEDClock_params.period = LED_CLOCK_PERIOD;
     PeriodicLEDClock_params.startFlag = TRUE;
-    PeriodicLEDClock_params.arg = (UArg)0x5555;
+    //PeriodicLEDClock_params.arg = (UArg)0x5555;
     PeriodicLEDClock_handle = Clock_create(PeriodicLEDClock_task, LED_CLOCK_PERIOD, &PeriodicLEDClock_params, &task_01_eb);
     if (PeriodicLEDClock_handle == NULL) {
         spinTask01();
